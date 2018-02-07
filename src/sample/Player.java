@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.LinkedList;
 
-public class Player extends Thread{
+public class Player{
     private Socket playerSocket;
     private Menu userMenu;
     private Game game;
@@ -12,6 +12,7 @@ public class Player extends Thread{
     private int numberOfTurnsToWait = 0;
     private int numberOfCardsToTake = 0;
     private int state;
+    int strike = 0;
 
 
     public Player(Socket socket, Game game, int state) throws IOException {
@@ -21,41 +22,32 @@ public class Player extends Thread{
         this.state = state;
 
     }
-
+    LinkedList<Card> getSetOfCards()
+    {
+        return this.setOfCards;
+    }
     Menu getUserMenu()
     {
         return this.userMenu;
     }
-
+    int getSizeOfSetOfCards()
+    {
+        return setOfCards.size();
+    }
     public void run()
     {
-        this.userMenu.sendToGame(game.table.getFileName());
-        this.userMenu.sendToGame(Integer.toString(state));
-        while(this.state!=0)
+
+        while(!this.playerSocket.isClosed())
         {
 
             try {
                 switch(userMenu.getLine())
                 {
+                    //give card
                     case 1:
 
                             setOfCards.add(this.game.giveCard());
                             this.userMenu.sendToGame(setOfCards.getLast().getFileName());
-
-                        break;
-                    case 2:
-                        if(this.state==2) {
-                            Card card = userMenu.getCard();
-                            if(this.game.putCardOnTable(card, this))
-                            {
-                                this.userMenu.sendToGame("1");
-                            }
-                            this.setState(1);
-                        }else
-                            this.userMenu.sendToGame("1");
-                        break;
-                    case 3:
-                        this.setState(3);
 
                         break;
                 }

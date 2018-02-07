@@ -9,15 +9,15 @@ import java.net.Socket;
 
 public class Menu{
     private Socket playerSocket;
-    PrintWriter out;
-    BufferedReader inBuff;
+    private PrintWriter out;
+    private BufferedReader inBuff;
 
     public Menu(Socket player) throws IOException {
         this.playerSocket = player;
 
-        this.out = new PrintWriter(player.getOutputStream(), true);
+        this.out = new PrintWriter(playerSocket.getOutputStream(), true);
 
-        this.inBuff = new BufferedReader(new InputStreamReader(player.getInputStream()));
+        this.inBuff = new BufferedReader(new InputStreamReader(playerSocket.getInputStream()));
     }
 
     int getLine() throws IOException {
@@ -36,8 +36,13 @@ public class Menu{
 
     Card getCard() throws IOException {
         String[] card = this.inBuff.readLine().split("_");
+        System.out.println(card);
         Card toReturn = new Card(Integer.parseInt(card[0]),card[1].substring(0,card[1].length()-4));
         return toReturn;
+    }
+
+    String getColor() throws IOException {
+        return this.inBuff.readLine();
     }
 
     void sendToGame(String toSend)

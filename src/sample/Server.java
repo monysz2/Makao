@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.util.LinkedList;
 
 public class Server {
-    static LinkedList<Game> games = new LinkedList<>();
+    static LinkedList<Thread> games = new LinkedList<>();
     static LinkedList<Player> players = new LinkedList<>();
 
     public Server() throws IOException {
@@ -24,16 +24,18 @@ public class Server {
                 if(gameToAdd.isFull())
                 {
 
+
+                    active = 2;
+                    gameToAdd.start();
                     gameToAdd = new Game();
                     games.add(gameToAdd);
-                    active = 2;
                 }
                 Socket player = serverSocket.accept();
                 Player playerToAdd = new Player(player,gameToAdd,active);
                 active=1;
                 gameToAdd.addPlayer(playerToAdd);
                 players.add(playerToAdd);
-                playerToAdd.start();
+                //playerToAdd.start();
             }
         }
 
