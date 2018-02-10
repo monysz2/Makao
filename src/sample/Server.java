@@ -35,7 +35,6 @@ public class Server {
                 active=1;
                 gameToAdd.addPlayer(playerToAdd);
                 players.add(playerToAdd);
-                //playerToAdd.start();
             }
         }
 

@@ -1,5 +1,7 @@
 package sample;
 
+import javafx.application.Platform;
+
 import java.io.IOException;
 import java.util.*;
 
@@ -10,25 +12,16 @@ public class Game extends Thread{
     private int numberOfPlayers;
     private int numberOfCardsToTake = 0;
     private int numberOfTurnsToWait = 0;
-    private boolean isFull;
     private static final int MAX_PLAYERS = 2;
     private String[] colors = {"hearts","spades","diamonds","clubs"};
     Card table = null;
     static final List<Integer> battleCards = Arrays.asList(2,3,13);
+    static final List<Integer> actionCards = Arrays.asList(1,4,11);
+    boolean battle = false ;
+    boolean turns = false;
+    boolean jack = false;
+    boolean ace = false;
 
-    Player getPlayers()
-    {
-        Player playerToReturn = null;
-        for(Player player : players)
-        {
-            if(player.getStatus()==2)
-            {
-                playerToReturn = player;
-                break;
-            }
-        }
-        return playerToReturn;
-    }
 
     public Game()
     {
@@ -54,15 +47,7 @@ public class Game extends Thread{
 
     }
 
-    int getMaxPlayers()
-    {
-        return this.MAX_PLAYERS;
-    }
 
-    int getNumberOfPlayers()
-    {
-        return this.numberOfPlayers;
-    }
     boolean addPlayer(Player toAdd)
     {
         numberOfPlayers++;
@@ -76,22 +61,48 @@ public class Game extends Thread{
         }
 
     }
-    public void action() throws IOException {
-        sendMessageToPlayer("20",activePlayer);
-        if(activePlayer.getUserMenu().getLine()==1)
-        {
-            Card toPut = activePlayer.getUserMenu().getCard();
-            switch(toPut.getValue())
-            {
-                case 1:
-                    activePlayer.getUserMenu().sendToGame("30");
-                    String color = activePlayer.getUserMenu().getColor();
-                    if(putCardOnTable(toPut,activePlayer,color))
-                    {
 
-                    }
+
+    void makao(Player player)
+    {
+        System.out.println("Cards in set: "+player.getSetOfCards().size());
+        if(this.players.get(players.indexOf(player)).getSizeOfSetOfCards()==1)
+        {
+            sendMessageToPlayer("100",player);
+            sendMessageToPlayer("101",players.get(getIndex(this.activePlayer,1)));
+        }else if(this.players.get(players.indexOf(player)).getSizeOfSetOfCards()==0)
+        {
+            sendMessageToPlayer("200",player);
+            sendMessageToPlayer("201",players.get(getIndex(this.activePlayer,1)));
+            try {
+                closeConnection();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
+    }
+    void closeConnection() throws IOException {
+        for(Player player : this.players)
+        {
+            player.getUserMenu().closeConnection();
+            player.closeSocket();
+        }
+    }
+
+    void sendInfo()
+    {
+        makao(activePlayer);
+        sendMessageToAll("4");
+        sendMessageToAll(table.getFileName());
+
+    }
+
+
+    void sendOpponentsCards()
+    {
+        sendMessageToAll("9");
+        sendMessageToPlayer(Integer.toString(players.get(getIndex(activePlayer,1)).getSizeOfSetOfCards()),activePlayer);
+        sendMessageToPlayer(Integer.toString(activePlayer.getSizeOfSetOfCards()),players.get(getIndex(activePlayer,1)));
     }
    public void run()
    {
@@ -108,56 +119,61 @@ public class Game extends Thread{
        }
        sendMessageToAll("4");
        sendMessageToAll(table.getFileName());
+       sendMessageToAll("5");
        activePlayer.getUserMenu().sendToGame("1");
        players.get(1).getUserMenu().sendToGame("2");
        while(isLive())
        {
-           sendMessageToPlayer("20",activePlayer);
-           try {
-               int activity = activePlayer.getUserMenu().getLine();
-               if(activity==1) {
-                   activePlayer.strike=0;
-                   Card toPut = activePlayer.getUserMenu().getCard();
-                   System.out.println("Card received");
-                   if (toPut.getValue() == 1) {
-                       sendMessageToPlayer("30", activePlayer);
+            sendOpponentsCards();
+           if(activePlayer.getNumberOfTurnsToWait()!=0)
+           {
+               sendMessageToPlayer("2",activePlayer);
+               activePlayer.setNumberOfTurnsToWait(activePlayer.getNumberOfTurnsToWait()-1);
+               changeToken();
+           }else {
+               sendMessageToPlayer("20", activePlayer);
+               try {
+                   int activity = activePlayer.getUserMenu().getLine();
+                   if (activity == 1) {
+                       activePlayer.strike = 0;
+                       Card toPut = activePlayer.getUserMenu().getCard();
+                       System.out.println("Card received");
+                       if (toPut.getValue() == 1) {
+                           sendMessageToPlayer("30", activePlayer);
 
-                       if (putCardOnTable(toPut, activePlayer, activePlayer.getUserMenu().getColor())) {
-                           sendMessageToAll("4");
-                           sendMessageToAll(table.getFileName());
+                           if (putCardOnTable(toPut, activePlayer, activePlayer.getUserMenu().getColor())) {
+                               sendInfo();
 
-                       } else
-                           sendMessageToPlayer("-20", activePlayer);
+                           } else
+                               sendMessageToPlayer("-20", activePlayer);
 
-                       sendMessageToAll("5");
-                       sendMessageToAll(table.getColor());
+                           sendMessageToAll("5");
+                           sendMessageToAll(table.getColor());
+                       } else {
+                           if (putCardOnTable(toPut, activePlayer)) {
+                               sendInfo();
+
+                           } else
+                               sendMessageToPlayer("-20", activePlayer);
+
+                       }
                    } else {
-                       if (putCardOnTable(toPut, activePlayer)) {
-                           sendMessageToAll("4");
-                           sendMessageToAll(table.getFileName());
+                       System.out.println("sending card");
+                       if (activePlayer.strike == 0) {
+                           activePlayer.strike = 1;
+                           sendCard(activePlayer);
 
                        } else
-                           sendMessageToPlayer("-20", activePlayer);
+                           activePlayer.strike = 0;
+
 
                    }
-               }else
-               {
-                   System.out.println("sending card");
-                   if(activePlayer.strike==0) {
-                       activePlayer.strike = 1;
-                       sendCard(activePlayer);
-
-                   }else
-                       activePlayer.strike=0;
 
 
+               } catch (IOException e) {
+                   e.printStackTrace();
                }
-
-
-           } catch (IOException e) {
-               e.printStackTrace();
            }
-
        }
    }
 
@@ -167,24 +183,40 @@ public class Game extends Thread{
         player.getSetOfCards().add(toAdd);
         sendMessageToPlayer("10", player);
         sendMessageToPlayer(toAdd.getFileName(), player);
-        if (battleCards.contains(table.getValue()) ) {
-            if ((toAdd.getValue() != table.getValue())) {
+        if (battleCards.contains(table.getValue()) || actionCards.contains(table.getValue())  ) {
+
+            if ((toAdd.getValue() != table.getValue()) && (battle || turns || ace)) {
                 System.out.println("True");
-                if(numberOfCardsToTake!=0) {
+                if(table.getValue()==4)
+                {
+                        sendTurnsAfterBattle(activePlayer);
+                        numberOfTurnsToWait=0;
+                        changeToken();
+                }
+                else if(numberOfCardsToTake!=0) {
                     sendCardsAfterBattle(activePlayer);
                     numberOfCardsToTake = 0;
                 }else
                 {
+
+                    activePlayer.strike=0;
                     changeToken();
+
                 }
 
+            }else
+            {
+                activePlayer.strike=0;
+                changeToken();
             }
         }else if(!(toAdd.getColor().equals(table.getColor())) )
         {
             if(toAdd.getValue()!=table.getValue())
             {
+                activePlayer.strike=0;
                 changeToken();
             }
+
         }
 
     }
@@ -238,7 +270,13 @@ public class Game extends Thread{
         setOfCards.remove(toGive);
         return toGive;
     }
-
+    void sendTurnsAfterBattle (Player player)
+    {
+        sendMessageToPlayer("70",player);
+        sendMessageToPlayer(Integer.toString(numberOfTurnsToWait),player);
+        player.setNumberOfTurnsToWait(numberOfTurnsToWait);
+        turns=false;
+    }
     void sendCardsAfterBattle(Player player)
     {
         for(int i=0; i<numberOfCardsToTake-1;i++)
@@ -249,68 +287,114 @@ public class Game extends Thread{
             sendMessageToPlayer(toAdd.getFileName(),player);
         }
         activePlayer.setState(1);
+
         sendMessageToPlayer("2",activePlayer);
         activePlayer = players.get(getIndex(player,1));
         activePlayer.setState(2);
         sendMessageToPlayer("1",activePlayer);
+        battle = false;
 
     }
     boolean putCardOnTable(Card toPut, Player player, String...color) throws IOException {
 
-        if((table==null)||(toPut.getColor().equals(table.getColor()))||(toPut.getValue()==table.getValue()))
-        {
-            table = toPut;
-            player.setState(1);
-            switch (toPut.getValue())
+        if ((table == null) || (toPut.getColor().equals(table.getColor())) || toPut.getValue()==table.getValue()) {
+            if (!battleCards.contains(toPut.getValue()) && battle) {
+                if (toPut.getValue() != table.getValue()) {
+                    return false;
+                }
+            }else if(!actionCards.contains(toPut.getValue()) && turns) {
+                if (toPut.getValue() != 4) {
+                    return false;
+                }
+            }else if(jack)
             {
-                case 1:
-                    action(toPut,player,color[0]);
-                    numberOfCardsToTake=0;
-                    break;
-                case 2:
-                    action(toPut,player);
-                    break;
-                case 3:
-                    action(toPut,player);
-                    break;
-                case 4:
-                    action(toPut,player);
-                    sendMessageToAll("7");
-                    sendMessageToAll(Integer.toString(numberOfTurnsToWait));
-                    numberOfCardsToTake=0;
-                    break;
-                case 11:
-                    sendMessageToPlayer("40",activePlayer);
-                    action(toPut,player);
-                    sendMessageToAll("8");
-                    sendMessageToAll(Integer.toString(toPut.getValue()));
-                    numberOfCardsToTake=0;
-                    break;
-                case 13:
-                    if((toPut.getColor().equals("hearts"))||(toPut.getColor().equals("spades")))
-                    {
-                        action(toPut,player);
-                        break;
-                    }
-                    else
-                        break;
-                default:
-                    break;
+                if(table.getValue()==toPut.getValue() || toPut.getValue()==11)
+                {
+                    table = toPut;
+                    changeToken();
+                    jack = false;
+                    turns=false;
+                    battle=false;
+                    this.players.get(this.players.indexOf(activePlayer)).getSetOfCards().removeLast();
+                    return true;
+                }
+                return false;
+            }else if(ace)
+            {
+                if(table.getColor().equals(toPut.getColor()) || toPut.getValue()==1)
+                {
+                    table = toPut;
+                    changeToken();
+                    ace = false;
+                    battle = false;
+                    jack=false;
+                    this.players.get(this.players.indexOf(activePlayer)).getSetOfCards().removeLast();
+                    return true;
+                }
+                return false;
             }
+            else {
+                table = toPut;
+                player.setState(1);
+                switch (toPut.getValue()) {
+                    case 1:
+                        action(toPut, player, color[0]);
+                        ace = true;
+                        battle = false;
+                        jack = false;
+                        numberOfCardsToTake = 0;
+                        break;
+                    case 2:
+                        action(toPut, player);
+                        battle = true;
+                        jack = false;
+                        ace = false;
+                        break;
+                    case 3:
+                        action(toPut, player);
+                        battle = true;
+                        jack = false;
+                        ace = false;
+                        break;
+                    case 4:
+                        System.out.println("4CARD");
+                        action(toPut, player);
+                        turns = true;
+                        battle=false;
+                        ace=false;
+                        numberOfCardsToTake = 0;
+                        break;
+                    case 11:
+                        sendMessageToPlayer("40", activePlayer);
+                        action(toPut, player);
+                        jack = true;
+                        ace=false;
+                        battle=false;
+                        numberOfCardsToTake = 0;
+                        break;
+                    case 13:
+                        if ((toPut.getColor().equals("hearts")) || (toPut.getColor().equals("spades"))) {
+                            action(toPut, player);
+                            battle = true;
+                            jack = false;
+                            ace = false;
+                            break;
+                        } else
+                            break;
+                    default:
+                        break;
+                }
+                this.players.get(this.players.indexOf(activePlayer)).getSetOfCards().removeLast();
+                sendMessageToPlayer("2", player);
+                player.setState(1);
+                activePlayer = players.get(getIndex(player, 1));
+                activePlayer.setState(2);
 
-            sendMessageToPlayer("2",player);
-            player.setState(1);
-            activePlayer = players.get(getIndex(player,1));
-            activePlayer.setState(2);
-
-            return true;
-        }else
-        {
-
-            return false;
+                return true;
+            }
         }
 
-
+        return false;
     }
 
     void generateSet()
@@ -339,7 +423,6 @@ public class Game extends Thread{
             case 1:
 
                 table.changeColor(color[0]);
-                sendMessageToAll(color[0]);
                 break;
             case 2:
 
@@ -355,15 +438,9 @@ public class Game extends Thread{
 
                 break;
             case 4:
-                numberOfTurnsToWait += card.getValue();
+                numberOfTurnsToWait ++;
                 sendMessageToAll("7");
                 sendMessageToAll(Integer.toString(numberOfTurnsToWait));
-                if(player.getNumberOfTurnsToWait()!=0)
-                {
-                    player.setNumberOfTurnsToWait(0);
-                }
-                players.get(getIndex(player,1)).setNumberOfTurnsToWait(numberOfTurnsToWait);
-                numberOfTurnsToWait=0;
                 break;
             case 11:
                 table.changeValue(Integer.parseInt(activePlayer.getUserMenu().getColor()));

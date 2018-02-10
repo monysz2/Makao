@@ -10,7 +10,6 @@ public class Player{
     private Game game;
     private LinkedList<Card> setOfCards = new LinkedList<>();
     private int numberOfTurnsToWait = 0;
-    private int numberOfCardsToTake = 0;
     private int state;
     int strike = 0;
 
@@ -22,6 +21,9 @@ public class Player{
         this.state = state;
 
     }
+   void closeSocket() throws IOException {
+       this.playerSocket.close();
+   }
     LinkedList<Card> getSetOfCards()
     {
         return this.setOfCards;
@@ -43,7 +45,7 @@ public class Player{
             try {
                 switch(userMenu.getLine())
                 {
-                    //give card
+
                     case 1:
 
                             setOfCards.add(this.game.giveCard());
@@ -56,22 +58,7 @@ public class Player{
             }
         }
     }
-    Socket getPlayerSocket()
-    {
-        return this.playerSocket;
-    }
 
-    public void addCardToSet(Card cardToAdd)
-    {
-        setOfCards.add(cardToAdd);
-    }
-
-    public Card putCardOnTable(Card cardToPut)
-    {
-        Card toReturn = setOfCards.get(setOfCards.indexOf(cardToPut));
-        setOfCards.remove(toReturn);
-        return toReturn;
-    }
 
     int getStatus()
     {
@@ -95,20 +82,6 @@ public class Player{
     public void setState(int stat)
     {
         this.state = stat;
-    }
-
-    void setNumberOfCardsToTake(int toTake)
-    {
-        if(toTake==0)
-        {
-            numberOfCardsToTake = 0;
-        }else
-        numberOfCardsToTake+=toTake;
-    }
-
-    int getNumberOfCardsToTake()
-    {
-        return this.numberOfCardsToTake;
     }
 
 

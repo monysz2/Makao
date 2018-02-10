@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Menu{
@@ -19,7 +18,10 @@ public class Menu{
 
         this.inBuff = new BufferedReader(new InputStreamReader(playerSocket.getInputStream()));
     }
-
+    void closeConnection() throws IOException {
+        this.inBuff.close();
+        this.out.close();
+    }
     int getLine() throws IOException {
 
         while(true)
